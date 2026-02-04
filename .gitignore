@@ -1,13 +1,23 @@
+# Build and Env
 .venv/
 __pycache__/
 *.pyc
-dev-ignore/
-report.md
-eval_bundle/
 
-# Secrets
-.env
+# Data and Artifacts
+data/
+logs/
+base_data/
+base_checkpoints/
+*.tar.gz
+*.parquet
+*.npy
 
-# Local setup
+# System/IDE
+.DS_Store
+.vscode/
+.idea/
 CLAUDE.md
 wandb/
+eval_bundle/
+report.md
+dev-ignore/

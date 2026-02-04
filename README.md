@@ -1,4 +1,4 @@
-# IaC-GPT
+## IaC-GPT
 
 **Infrastructure-as-Code Specialist LLM**
 
