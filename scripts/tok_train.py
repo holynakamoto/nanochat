@@ -16,7 +16,8 @@ from nanochat.dataset import parquets_iter_batched
 parser = argparse.ArgumentParser(description='Train a BPE tokenizer')
 parser.add_argument('--max-chars', type=int, default=2_000_000_000, help='Maximum characters to train on (default: 10B)')
 parser.add_argument('--doc-cap', type=int, default=10_000, help='Maximum characters per document (default: 10,000)')
-parser.add_argument('--vocab-size', type=int, default=32768, help='Vocabulary size (default: 32768 = 2^15)')
+parser.add_argument('--vocab-size', type=int, default=49152, help='Vocabulary size (default: 49152 = 48K = 3×2^14). 48K for IaC-GPT: covers resource type identifiers, K8s API objects, Ansible modules, plus English text tokens.')
+parser.add_argument('--validate', action='store_true', help='Run post-training validation suite with IaC-specific compression ratio tests')
 args = parser.parse_args()
 print(f"max_chars: {args.max_chars:,}")
 print(f"doc_cap: {args.doc_cap:,}")
@@ -68,6 +69,12 @@ encoded = tokenizer.encode(test_text)
 decoded = tokenizer.decode(encoded)
 assert decoded == test_text
 
+# IaC-specific sanity check
+iac_test = 'resource "aws_vpc" "main" {\n  cidr_block = var.vpc_cidr\n  enable_dns_hostnames = true\n}'
+iac_encoded = tokenizer.encode(iac_test)
+iac_decoded = tokenizer.decode(iac_encoded)
+assert iac_decoded == iac_test
+
 # -----------------------------------------------------------------------------
 # One more thing: we wish to cache a mapping from token id to number of bytes of that token
 # for efficient evaluation of bits per byte. Unlike the typical mean loss, this
@@ -89,6 +96,40 @@ token_bytes_path = os.path.join(tokenizer_dir, "token_bytes.pt")
 with open(token_bytes_path, "wb") as f:
     torch.save(token_bytes, f)
 print(f"Saved token_bytes to {token_bytes_path}")
+
+# -----------------------------------------------------------------------------
+# Optional IaC-GPT validation suite
+if args.validate:
+    print("\n" + "=" * 80)
+    print("IaC-GPT Tokenizer Validation Suite")
+    print("=" * 80)
+
+    test_cases = [
+        ("TF interpolation",   '${aws_instance.web.id}'),
+        ("CIDR notation",      '10.0.0.0/16'),
+        ("K8s resource",       'apiVersion: apps/v1\nkind: Deployment'),
+        ("Ansible task",       '- name: Install Docker\n  apt:\n    name: docker-ce\n    state: present'),
+        ("HCL variable block", 'variable "vpc_cidr" {\n  description = "CIDR block for VPC"\n  type = string\n  default = "10.0.0.0/16"\n}'),
+        ("English requirement", 'Create an AWS VPC with public and private subnets across three availability zones'),
+    ]
+
+    print(f"\n{'Test Name':<25} | {'Chars':>6} | {'Tokens':>6} | {'Chars/Tok':>9}")
+    print("-" * 55)
+
+    for test_name, test_string in test_cases:
+        enc_tokens = tokenizer.encode(test_string)
+        n_chars = len(test_string)
+        n_tokens = len(enc_tokens)
+        ratio = n_chars / n_tokens if n_tokens > 0 else 0.0
+
+        is_code = test_name != "English requirement"
+        threshold = 4.0 if is_code else 5.0
+        flag = "" if ratio >= threshold else " (low)"
+        print(f"{test_name:<25} | {n_chars:>6} | {n_tokens:>6} | {ratio:>8.2f}{flag}")
+
+    print("=" * 55)
+    print("Target: >= 4.0 chars/token for IaC code, >= 5.0 for English")
+    print()
 
 # Log to report
 from nanochat.report import get_report

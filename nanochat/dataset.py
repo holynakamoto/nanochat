@@ -1,28 +1,25 @@
 """
-The base/pretraining dataset is a set of parquet files.
-This file contains utilities for:
-- iterating over the parquet files and yielding documents from it
-- download the files on demand if they are not on disk
+Generic local dataset module for working with parquet files.
 
-For details of how the dataset was prepared, see `repackage_data_reference.py`.
+This module provides utilities for:
+- Listing parquet files in the data directory
+- Iterating over parquet files and yielding batches of documents
+- Getting statistics about the dataset (shard count, rows, size)
+- Validating dataset integrity
+
+The dataset is expected to be generated locally via the scraping/repackaging
+pipeline. For details on data preparation, see `repackage_data_reference.py`.
 """
 
 import os
 import argparse
-import time
-import requests
 import pyarrow.parquet as pq
-from multiprocessing import Pool
 
 from nanochat.common import get_base_dir
 
 # -----------------------------------------------------------------------------
-# The specifics of the current pretraining dataset
+# Data directory setup
 
-# The URL on the internet where the data is hosted and downloaded from on demand
-BASE_URL = "https://huggingface.co/datasets/karpathy/fineweb-edu-100b-shuffle/resolve/main"
-MAX_SHARD = 1822 # the last datashard is shard_01822.parquet
-index_to_filename = lambda index: f"shard_{index:05d}.parquet" # format of the filenames
 base_dir = get_base_dir()
 DATA_DIR = os.path.join(base_dir, "base_data")
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -56,73 +53,96 @@ def parquets_iter_batched(split, start=0, step=1):
             texts = rg.column('text').to_pylist()
             yield texts
 
+def dataset_info(data_dir=None):
+    """
+    Scan the local parquet files and return dataset statistics.
+
+    Returns:
+        dict with keys:
+            - shard_count: number of parquet files
+            - total_row_groups: sum of row groups across all shards
+            - estimated_docs: estimated total documents (sum of rows across all row groups)
+            - total_size_bytes: total size of all parquet files in bytes
+    """
+    parquet_paths = list_parquet_files(data_dir)
+
+    shard_count = len(parquet_paths)
+    total_row_groups = 0
+    estimated_docs = 0
+    total_size_bytes = 0
+
+    for filepath in parquet_paths:
+        total_size_bytes += os.path.getsize(filepath)
+        pf = pq.ParquetFile(filepath)
+        total_row_groups += pf.num_row_groups
+        for rg_idx in range(pf.num_row_groups):
+            estimated_docs += pf.metadata.row_group(rg_idx).num_rows
+
+    return {
+        'shard_count': shard_count,
+        'total_row_groups': total_row_groups,
+        'estimated_docs': estimated_docs,
+        'total_size_bytes': total_size_bytes,
+    }
+
 # -----------------------------------------------------------------------------
-def download_single_file(index):
-    """ Downloads a single file index, with some backoff """
-
-    # Construct the local filepath for this file and skip if it already exists
-    filename = index_to_filename(index)
-    filepath = os.path.join(DATA_DIR, filename)
-    if os.path.exists(filepath):
-        print(f"Skipping {filepath} (already exists)")
-        return True
-
-    # Construct the remote URL for this file
-    url = f"{BASE_URL}/{filename}"
-    print(f"Downloading {filename}...")
-
-    # Download with retries
-    max_attempts = 5
-    for attempt in range(1, max_attempts + 1):
-        try:
-            response = requests.get(url, stream=True, timeout=30)
-            response.raise_for_status()
-            # Write to temporary file first
-            temp_path = filepath + f".tmp"
-            with open(temp_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=1024 * 1024):  # 1MB chunks
-                    if chunk:
-                        f.write(chunk)
-            # Move temp file to final location
-            os.rename(temp_path, filepath)
-            print(f"Successfully downloaded {filename}")
-            return True
-
-        except (requests.RequestException, IOError) as e:
-            print(f"Attempt {attempt}/{max_attempts} failed for {filename}: {e}")
-            # Clean up any partial files
-            for path in [filepath + f".tmp", filepath]:
-                if os.path.exists(path):
-                    try:
-                        os.remove(path)
-                    except:
-                        pass
-            # Try a few times with exponential backoff: 2^attempt seconds
-            if attempt < max_attempts:
-                wait_time = 2 ** attempt
-                print(f"Waiting {wait_time} seconds before retry...")
-                time.sleep(wait_time)
-            else:
-                print(f"Failed to download {filename} after {max_attempts} attempts")
-                return False
-
-    return False
-
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Download FineWeb-Edu 100BT dataset shards")
-    parser.add_argument("-n", "--num-files", type=int, default=-1, help="Number of shards to download (default: -1), -1 = disable")
-    parser.add_argument("-w", "--num-workers", type=int, default=4, help="Number of parallel download workers (default: 4)")
+    parser = argparse.ArgumentParser(description="Dataset utilities for local parquet files")
+    parser.add_argument("--info", action="store_true", help="Print dataset statistics")
+    parser.add_argument("--validate", action="store_true", help="Validate all parquet files are readable and have 'text' column")
     args = parser.parse_args()
 
-    num = MAX_SHARD + 1 if args.num_files == -1 else min(args.num_files, MAX_SHARD + 1)
-    ids_to_download = list(range(num))
-    print(f"Downloading {len(ids_to_download)} shards using {args.num_workers} workers...")
-    print(f"Target directory: {DATA_DIR}")
-    print()
-    with Pool(processes=args.num_workers) as pool:
-        results = pool.map(download_single_file, ids_to_download)
+    if args.info:
+        print("=" * 60)
+        print("Dataset Information")
+        print("=" * 60)
+        print(f"Data directory: {DATA_DIR}")
+        print()
 
-    # Report results
-    successful = sum(1 for success in results if success)
-    print(f"Done! Downloaded: {successful}/{len(ids_to_download)} shards to {DATA_DIR}")
+        info = dataset_info()
+        print(f"{'Shard count':20s}: {info['shard_count']}")
+        print(f"{'Total row groups':20s}: {info['total_row_groups']:,}")
+        print(f"{'Estimated documents':20s}: {info['estimated_docs']:,}")
+        print(f"{'Total size':20s}: {info['total_size_bytes']:,} bytes ({info['total_size_bytes'] / (1024**3):.2f} GB)")
+        print("=" * 60)
+
+    if args.validate:
+        print("=" * 60)
+        print("Dataset Validation")
+        print("=" * 60)
+        print(f"Data directory: {DATA_DIR}")
+        print()
+
+        parquet_paths = list_parquet_files()
+        if not parquet_paths:
+            print("No parquet files found!")
+            exit(1)
+
+        all_valid = True
+        for i, filepath in enumerate(parquet_paths, 1):
+            filename = os.path.basename(filepath)
+            try:
+                pf = pq.ParquetFile(filepath)
+                schema = pf.schema_arrow
+
+                if 'text' not in schema.names:
+                    print(f"[{i}/{len(parquet_paths)}] {filename}: FAILED - missing 'text' column")
+                    all_valid = False
+                else:
+                    num_rows = sum(pf.metadata.row_group(rg_idx).num_rows for rg_idx in range(pf.num_row_groups))
+                    print(f"[{i}/{len(parquet_paths)}] {filename}: OK ({pf.num_row_groups} row groups, {num_rows:,} rows)")
+            except Exception as e:
+                print(f"[{i}/{len(parquet_paths)}] {filename}: FAILED - {e}")
+                all_valid = False
+
+        print()
+        if all_valid:
+            print("All parquet files are valid!")
+        else:
+            print("Some parquet files failed validation.")
+            exit(1)
+        print("=" * 60)
+
+    if not args.info and not args.validate:
+        parser.print_help()

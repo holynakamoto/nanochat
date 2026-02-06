@@ -1,35 +1,39 @@
 # IaC-GPT Training on Kaggle (FREE GPUs!)
 
-Train your Infrastructure-as-Code LLM on free Kaggle GPUs.
+Train your Infrastructure-as-Code LLM on free Kaggle GPUs. Supports checkpoint
+persistence and resume across the 12-hour session limit.
 
-## ⚙️ Kaggle Setup
+## Kaggle Setup
 
 1. **Create a new notebook:** https://kaggle.com/code
 2. **Enable GPU:** Settings → Accelerator → **GPU T4 x2**
 3. **Enable Internet:** Settings → Internet → **On**
-4. **Run all cells below**
+4. **Set your Kaggle username** in the config cell
+5. **Run all cells**
 
 ---
 
-## 🔧 Configuration (IMPORTANT!)
+## Configuration
 
 ```python
-# === CONFIGURATION ===
-# T4 GPUs have 15GB VRAM - use smaller batch size!
-
-MODEL_DEPTH = 12        # 12 (~300M, ~3hrs) | 16 (~500M, ~8hrs) | 20 (~800M, ~18hrs)
-BATCH_SIZE = 2          # 2 for T4 GPUs (SAFE MODE - prevents OOM)
+MODEL_DEPTH = 12        # 12 (~286M, ~3hrs) | 16 (~400M, ~8hrs) | 24 (~1.6B, won't fit T4)
+BATCH_SIZE = 2          # 2 for T4 GPUs (prevents OOM)
 NUM_GPUS = 2            # Kaggle T4 x2
-WINDOW_PATTERN = "L"    # Use "L" (full attention) instead of "SSSL" for T4s
+WINDOW_PATTERN = "L"    # Full attention (don't use SSSL on T4s)
+DATA_RATIO = 8          # target-param-data-ratio
 
-print(f"Training config: d{MODEL_DEPTH} model, batch_size={BATCH_SIZE}, gpus={NUM_GPUS}")
+# Resume from a previous session
+RESUME = False           # Set True to continue training
+RESUME_STEP = -1         # -1 = auto-detect, or set specific step
+
+KAGGLE_USERNAME = "YOUR_USERNAME_HERE"
 ```
 
 **Why batch_size=2?**
 - T4 GPUs have 15GB VRAM (vs H100's 80GB)
 - Without Flash Attention 3, memory usage is higher
-- Batch size 4 = OOM error during backward pass ❌
-- Batch size 2 = Safe Mode works perfectly ✅
+- Batch size 4 = OOM error during backward pass
+- Batch size 2 = works reliably
 
 ---
 
@@ -106,9 +110,9 @@ cmd = f"""torchrun --standalone --nproc_per_node={NUM_GPUS} -m scripts.base_trai
     --target-param-data-ratio=5 \
     --run=dummy \
     --model-tag=iac-gpt-d{MODEL_DEPTH} \
-    --eval-every=200 \
-    --sample-every=500 \
-    --save-every=1000"""
+    --eval-every=100 \
+    --sample-every=100 \
+    --save-every=100"""
 
 print(f"Running: {cmd}")
 !{cmd}
@@ -229,51 +233,45 @@ BATCH_SIZE = 2  # Even more conservative
 
 ---
 
-## 💡 Pro Tips
+## Resume Training Across Sessions
 
-1. **Use Progressive Training**
-   - Start with d12 (3hrs) to validate
-   - Then try d16 (8hrs) or d20 (18hrs)
+Kaggle kills sessions after 12 hours. The notebook auto-saves your progress:
 
-2. **Monitor GPU Usage**
-   ```bash
-   !nvidia-smi -l 1  # Live monitoring
-   ```
+1. After training, the "Save Checkpoints" cell uploads to Kaggle Datasets
+2. Start a new notebook, add your saved datasets as Inputs
+3. Set `RESUME = True`, run all cells
+4. Scraping is skipped (data cached), training resumes from last checkpoint
 
-3. **Save Checkpoints**
-   - Model auto-saves every 1000 steps
-   - Can resume if Kaggle disconnects
-
-4. **Kaggle Limits**
-   - 30 GPU hours/week (free tier)
-   - 12 hour session limit
-   - Plan your training accordingly!
+**What gets saved:**
+- Model weights (`model_*.pt`)
+- Optimizer state (`optim_*.pt`) -- needed for smooth resume
+- Training metadata (`meta_*.json`) -- step count, loss, dataloader position
+- Training data shards (`*.parquet`) -- so you never re-scrape
 
 ---
 
-## 📚 Next Steps
+## GPU Options
 
-After downloading your model:
+| Platform | GPU | VRAM | Free? | d12 time | d16 time |
+|----------|-----|------|-------|----------|----------|
+| Kaggle | T4 x2 | 15GB each | Yes (30hr/week) | ~3hrs | ~8hrs |
+| Colab Free | T4 x1 | 15GB | Yes (limited) | ~6hrs | ~16hrs |
+| Colab Pro | A100 x1 | 40GB | $10/mo | ~1hr | ~3hrs |
+| Lambda | A100 x1 | 80GB | ~$1.10/hr | ~40min | ~2hrs |
 
-1. **Local Inference:** Use `scripts/chat_cli.py` or `scripts/chat_web.py`
-2. **Test on Real IaC:** Generate Terraform/K8s configs
-3. **Fine-tune:** Add your organization's IaC patterns
-4. **Deploy:** Run as a local API for your dev team
-
----
-
-## 🎉 You Did It!
-
-You just trained a domain-specific LLM for Infrastructure-as-Code **for FREE** on Kaggle.
-
-**Cost:** $0  
-**Time:** 3-18 hours  
-**Result:** Your own IaC expert model
-
-Share your results with the community! 🚀
+For d12 on your current corpus, **Kaggle T4 x2 is fine** -- it completes in one session.
+For d16+, you'll need the resume feature or a faster GPU.
 
 ---
 
-*Last updated: 2026-02-04*  
-*Tested on: Kaggle T4 x2 GPUs*  
-*Model: nanochat-based IaC-GPT*
+## Pro Tips
+
+1. **Progressive training:** Start d12 to validate, then d16 if it looks good
+2. **Monitor:** Loss should drop from ~10.0 to <3.5 for d12
+3. **Kaggle limits:** 30 GPU hrs/week free. d12 uses ~3hrs = 10 runs/week
+4. **WandB:** Add your API key to track loss curves across sessions
+
+---
+
+*Last updated: 2026-02-06*
+*Tested on: Kaggle T4 x2 GPUs*
