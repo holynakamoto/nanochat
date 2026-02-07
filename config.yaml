@@ -1,0 +1,25 @@
+model:
+  name: "IaC-GPT-1.3B"
+  vocab_size: 32000      # Optimized for IaC/Code (e.g., DeepSeek-style)
+  hidden_size: 2048      # The "width" of the model
+  intermediate_size: 5504 # FFN expansion (approx 2.7x hidden_size)
+  num_hidden_layers: 24  # Deep enough for architectural reasoning
+  num_attention_heads: 16 # 128-dim per head (2048 / 16)
+  num_key_value_heads: 16 # Grouped-Query Attention (GQA) ready
+  max_position_embeddings: 4096 # Standard window; can scale to 16k later
+  rms_norm_eps: 1e-5
+  rope_theta: 10000.0
+
+training:
+  batch_size_per_gpu: 8  # Adjusted for T4 VRAM (16GB)
+  gradient_accumulation_steps: 4 # Effective batch size = 8 * 4 * 2 GPUs = 64
+  learning_rate: 3.0e-4  # "Sweet spot" for 1.3B code models
+  weight_decay: 0.1
+  lr_scheduler_type: "cosine"
+  warmup_steps: 1000
+  precision: "bf16"      # Use "fp16" if on older T4s, "bf16" for L4/A100
+  
+optimizer:
+  type: "Muon"           # Using the 2026 Polar Express orthogonalization
+  beta1: 0.9
+  beta2: 0.95

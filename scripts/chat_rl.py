@@ -23,6 +23,9 @@ import wandb
 import torch
 import torch.distributed as dist
 from contextlib import nullcontext
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from common import compute_init, compute_cleanup, print0, get_base_dir, DummyWandb, autodetect_device_type
 from checkpoint_manager import save_checkpoint, load_model
