@@ -19,11 +19,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from nanochat.common import get_dist_info, print0
-from nanochat.optim import MuonAdamW, DistMuonAdamW
+from common import get_dist_info, print0
+from optim import MuonAdamW, DistMuonAdamW
 
 # Our custom Flash Attention module that automatically uses FA3 on Hopper+ and SDPA fallback elsewhere
-from nanochat.flash_attention import flash_attn
+from flash_attention import flash_attn
 
 @dataclass
 class GPTConfig:

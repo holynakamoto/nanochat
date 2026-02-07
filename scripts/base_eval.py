@@ -33,13 +33,13 @@ from contextlib import nullcontext
 
 import torch
 
-from nanochat.common import compute_init, compute_cleanup, print0, get_base_dir, autodetect_device_type, download_file_with_lock
-from nanochat.tokenizer import HuggingFaceTokenizer, get_token_bytes
-from nanochat.checkpoint_manager import load_model
-from nanochat.core_eval import evaluate_task
-from nanochat.dataloader import tokenizing_distributed_data_loader_bos_bestfit
-from nanochat.loss_eval import evaluate_bpb
-from nanochat.engine import Engine
+from common import compute_init, compute_cleanup, print0, get_base_dir, autodetect_device_type, download_file_with_lock
+from tokenizer import HuggingFaceTokenizer, get_token_bytes
+from checkpoint_manager import load_model
+from core_eval import evaluate_task
+from dataloader import tokenizing_distributed_data_loader_bos_bestfit
+from loss_eval import evaluate_bpb
+from engine import Engine
 
 # -----------------------------------------------------------------------------
 # HuggingFace loading utilities
@@ -306,7 +306,7 @@ def main():
         print0("\nSkipping sampling for HuggingFace models (not supported)")
 
     # --- Log to report ---
-    from nanochat.report import get_report
+    from report import get_report
     report_data = [{"model": model_name}]
 
     if core_results:

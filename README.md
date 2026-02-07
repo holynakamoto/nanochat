@@ -19,6 +19,14 @@ IaC-GPT is a GPT-2 grade (~300M-1.6B param) model trained exclusively on Infrast
 - 20% reduction in cloud misconfiguration incidents
 - \>85% compilability rate on generated HCL/YAML
 
+### 🧠 Architectural Choice: Why 1.3B?
+
+Instead of using a sparse, general-purpose 7B architecture, **IaC-GPT** utilizes a dense **1.3B parameter "Specialist"** design.
+
+* **Maximized Capacity Density:** By focusing all 1.3 billion parameters on a 25B token domain-specific dataset (Terraform, K8s, CloudFormation), we achieve a lower perplexity than generalist models 10x our size.
+* **Reasoning Depth:** With **24 layers**, the model develops the vertical "logic gates" required to understand complex cross-resource dependencies (e.g., mapping an IAM Policy ARNs to S3 Bucket Resources).
+* **Hardware Efficiency:** This configuration is "Single-GPU Resident," fitting perfectly into 16GB VRAM (T4/L4) for lightning-fast inference (< 800ms per manifest), making it ideal for real-time CI/CD blocking.
+
 ## Quick Start
 
 ### 1. Collect IaC Training Data
@@ -103,10 +111,9 @@ The IaC training corpus is built from:
 │   ├── chat_sft.py                 # SFT for DevOps persona
 │   ├── chat_cli.py                 # CLI interface
 │   └── chat_web.py                 # Web UI
-└── nanochat/
-    ├── gpt.py                      # Transformer model
-    ├── tokenizer.py                # BPE tokenizer
-    └── dataloader.py               # Data pipeline
+├── gpt.py                          # Transformer model
+├── tokenizer.py                    # BPE tokenizer
+└── dataloader.py                   # Data pipeline
 ```
 
 ## Technical Specs

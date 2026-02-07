@@ -16,19 +16,22 @@ import os
 os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 import argparse
 import time
+import json
+import yaml
 from contextlib import nullcontext
+from types import SimpleNamespace
 
 import wandb
 import torch
 
-from nanochat.gpt import GPT, GPTConfig
-from nanochat.dataloader import tokenizing_distributed_data_loader_bos_bestfit, tokenizing_distributed_data_loader_with_state_bos_bestfit
-from nanochat.common import compute_init, compute_cleanup, print0, DummyWandb, print_banner, get_base_dir, autodetect_device_type, get_peak_flops
-from nanochat.tokenizer import get_tokenizer, get_token_bytes
-from nanochat.checkpoint_manager import save_checkpoint, load_checkpoint
-from nanochat.loss_eval import evaluate_bpb
-from nanochat.engine import Engine
-from nanochat.flash_attention import HAS_FA3
+from gpt import GPT, GPTConfig
+from dataloader import tokenizing_distributed_data_loader_bos_bestfit, tokenizing_distributed_data_loader_with_state_bos_bestfit
+from common import compute_init, compute_cleanup, print0, DummyWandb, print_banner, get_base_dir, autodetect_device_type, get_peak_flops
+from tokenizer import get_tokenizer, get_token_bytes
+from checkpoint_manager import save_checkpoint, load_checkpoint
+from loss_eval import evaluate_bpb
+from engine import Engine
+from flash_attention import HAS_FA3
 from scripts.base_eval import evaluate_core
 print_banner()
 
@@ -40,7 +43,11 @@ parser.add_argument("--run", type=str, default="dummy", help="wandb run name ('d
 # Runtime
 parser.add_argument("--device-type", type=str, default="", help="cuda|cpu|mps (empty = autodetect)")
 # Model architecture
-parser.add_argument("--depth", type=int, default=20, help="depth of the Transformer model")
+parser.add_argument("--config", type=str, default="config.yaml", help="path to yaml config file")
+parser.add_argument("--depth", type=int, default=20, help="depth of the Transformer model (n_layer)")
+parser.add_argument("--n-embd", type=int, default=-1, help="embedding dimension (overrides depth * aspect_ratio)")
+parser.add_argument("--n-head", type=int, default=-1, help="number of attention heads")
+parser.add_argument("--n-kv-head", type=int, default=-1, help="number of KV heads")
 parser.add_argument("--aspect-ratio", type=int, default=64, help="model_dim = depth * aspect_ratio")
 parser.add_argument("--head-dim", type=int, default=128, help="target head dimension for attention")
 parser.add_argument("--max-seq-len", type=int, default=2048, help="max context length")
@@ -74,6 +81,31 @@ parser.add_argument("--save-every", type=int, default=-1, help="save checkpoints
 # Output
 parser.add_argument("--model-tag", type=str, default=None, help="override model tag for checkpoint directory name")
 args = parser.parse_args()
+
+# Load YAML config if present
+if os.path.exists(args.config):
+    with open(args.config, 'r') as f:
+        yaml_config = yaml.safe_load(f)
+    
+    # Merge yaml config into args where not explicitly overridden by user
+    # This is a bit tricky with argparse, but we can check if the arg was changed from default
+    # For simplicity here, let's just create a merged config object
+    def get_val(section, key, default):
+        if yaml_config and section in yaml_config and key in yaml_config[section]:
+            return yaml_config[section][key]
+        return default
+
+    # Architectures
+    if args.depth == 20: args.depth = get_val('model', 'num_hidden_layers', args.depth)
+    if args.n_embd == -1: args.n_embd = get_val('model', 'hidden_size', args.n_embd)
+    if args.n_head == -1: args.n_head = get_val('model', 'num_attention_heads', args.n_head)
+    if args.n_kv_head == -1: args.n_kv_head = get_val('model', 'num_key_value_heads', args.n_kv_head)
+    if args.max_seq_len == 2048: args.max_seq_len = get_val('model', 'max_position_embeddings', args.max_seq_len)
+    
+    # Training
+    if args.device_batch_size == 32: args.device_batch_size = get_val('training', 'batch_size_per_gpu', args.device_batch_size)
+    if args.weight_decay == 0.2: args.weight_decay = get_val('training', 'weight_decay', args.weight_decay)
+
 user_config = vars(args).copy()  # for logging
 # -----------------------------------------------------------------------------
 
@@ -127,11 +159,19 @@ print0(f"Vocab size: {vocab_size:,}")
 # (FA3 requires head_dim divisible by 8, and this guarantees head_dim == args.head_dim exactly)
 # (For very small depths, this gives a slight "unfair" advantage to models with odd depths)
 num_layers = args.depth
-base_dim = args.depth * args.aspect_ratio
-model_dim = ((base_dim + args.head_dim - 1) // args.head_dim) * args.head_dim
-num_heads = model_dim // args.head_dim
-num_kv_heads = num_heads # default is 1:1 GQA (Group Query Attention) ratio (i.e. GQA is disabled)
-head_dim = model_dim // num_heads
+if args.n_embd != -1:
+    model_dim = args.n_embd
+    num_heads = args.n_head if args.n_head != -1 else model_dim // args.head_dim
+    num_kv_heads = args.n_kv_head if args.n_kv_head != -1 else num_heads
+    head_dim = model_dim // num_heads
+    base_dim = model_dim
+else:
+    base_dim = args.depth * args.aspect_ratio
+    model_dim = ((base_dim + args.head_dim - 1) // args.head_dim) * args.head_dim
+    num_heads = model_dim // args.head_dim
+    num_kv_heads = num_heads # default is 1:1 GQA (Group Query Attention) ratio (i.e. GQA is disabled)
+    head_dim = model_dim // num_heads
+
 print0(f"num_layers: {num_layers}")
 print0(f"model_dim: {model_dim} (base: {base_dim}, nudge: {model_dim - base_dim:+d})")
 print0(f"num_heads: {num_heads}")
@@ -472,7 +512,7 @@ if val_bpb is not None:
     print0(f"Minimum validation bpb: {min_val_bpb:.6f}")
 
 # Log to report
-from nanochat.report import get_report
+from report import get_report
 get_report().log(section="Base model training", data=[
     user_config, # CLI args
     { # stats about the training setup

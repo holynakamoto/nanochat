@@ -32,9 +32,9 @@ def load_model(model_path: Optional[str] = None):
     # Import nanochat modules
     sys.path.insert(0, str(Path(__file__).parent.parent))
     
-    from nanochat.engine import Engine
-    from nanochat.tokenizer import RustBPETokenizer
-    from nanochat.common import get_base_dir
+    from engine import Engine
+    from tokenizer import RustBPETokenizer
+    from common import get_base_dir
     
     if model_path is None:
         # Try to find the latest IaC-GPT model

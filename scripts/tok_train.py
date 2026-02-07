@@ -6,9 +6,9 @@ import os
 import time
 import argparse
 import torch
-from nanochat.tokenizer import RustBPETokenizer
-from nanochat.common import get_base_dir
-from nanochat.dataset import parquets_iter_batched
+from tokenizer import RustBPETokenizer
+from common import get_base_dir
+from dataset import parquets_iter_batched
 
 # -----------------------------------------------------------------------------
 # Parse command line arguments
@@ -132,7 +132,7 @@ if args.validate:
     print()
 
 # Log to report
-from nanochat.report import get_report
+from report import get_report
 token_bytes_nonzero = (token_bytes[token_bytes > 0]).to(dtype=torch.float32)
 get_report().log(section="Tokenizer training", data=[
     vars(args), # argparse command line arguments

@@ -5,7 +5,7 @@ Exports `flash_attn` module that matches the FA3 API exactly, but falls back
 to PyTorch SDPA on non-Hopper GPUs (including Blackwell), MPS, and CPU.
 
 Usage (drop-in replacement for FA3):
-    from nanochat.flash_attention import flash_attn
+    from flash_attention import flash_attn
 
     # Training (no KV cache)
     y = flash_attn.flash_attn_func(q, k, v, causal=True, window_size=window_size)

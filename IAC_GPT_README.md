@@ -226,7 +226,7 @@ python -m scripts.chat_sft \
 ## 📁 File Structure
 
 ```
-nanochat/
+.
 ├── dev/
 │   ├── scrape_iac_data.py           # Step 1: GitHub scraper
 │   ├── repackage_iac_data.py        # Step 2: Create training shards
@@ -238,6 +238,10 @@ nanochat/
 │
 ├── runs/
 │   └── speedrun_iac.sh              # One-command training script
+│
+├── gpt.py                           # Transformer model
+├── tokenizer.py                     # BPE tokenizer
+├── dataloader.py                    # Data pipeline
 │
 └── data/
     └── iac_raw/                     # Your scraped IaC files

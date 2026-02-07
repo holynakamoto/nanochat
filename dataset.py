@@ -15,7 +15,7 @@ import os
 import argparse
 import pyarrow.parquet as pq
 
-from nanochat.common import get_base_dir
+from common import get_base_dir
 
 # -----------------------------------------------------------------------------
 # Data directory setup

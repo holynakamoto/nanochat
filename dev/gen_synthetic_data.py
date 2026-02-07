@@ -26,7 +26,7 @@ import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
 
-from nanochat.common import get_base_dir
+from common import get_base_dir
 
 load_dotenv()
 api_key = os.environ["OPENROUTER_API_KEY"]

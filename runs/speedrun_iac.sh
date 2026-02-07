@@ -23,10 +23,10 @@ echo "========================================"
 echo ""
 
 # Configuration
-RUN_NAME="iac_gpt_d24_$(date +%Y%m%d_%H%M%S)"
-MODEL_TAG="iac_gpt_d24"
-DEPTH=24
-DEVICE_BATCH_SIZE=16
+RUN_NAME="iac_gpt_1.3b_$(date +%Y%m%d_%H%M%S)"
+MODEL_TAG="iac_gpt_1.3b"
+DEVICE_BATCH_SIZE=8
+CONFIG_FILE="config.yaml"
 DATA_DIR="$HOME/.cache/nanochat/iac_data"
 
 # Check if data exists
@@ -67,11 +67,11 @@ if [ -L ~/.cache/nanochat/base_data ]; then
 fi
 ln -s "$DATA_DIR" ~/.cache/nanochat/base_data
 
-echo "Starting distributed training on 8 GPUs..."
+echo "Starting distributed training on 2 GPUs..."
 echo ""
 
-OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=8 -m scripts.base_train -- \
-    --depth=$DEPTH \
+OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=2 -m scripts.base_train -- \
+    --config=$CONFIG_FILE \
     --run="$RUN_NAME" \
     --model-tag="$MODEL_TAG" \
     --device-batch-size=$DEVICE_BATCH_SIZE \
@@ -79,7 +79,7 @@ OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=8 -m scripts.base_train
     --save-every=3000 \
     --core-metric-max-per-task=-1 \
     --core-metric-every=3000 \
-    --target-param-data-ratio=12
+    --target-param-data-ratio=20
 
 echo ""
 echo "========================================"
@@ -100,7 +100,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     python dev/gen_iac_identity.py --output data/iac_identity.jsonl
     
     echo "Fine-tuning with identity..."
-    OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=8 -m scripts.chat_sft -- \
+    OMP_NUM_THREADS=1 torchrun --standalone --nproc_per_node=2 -m scripts.chat_sft -- \
         --base-model="logs/$RUN_NAME/latest_checkpoint" \
         --data="data/iac_identity.jsonl" \
         --model-tag="${MODEL_TAG}_identity" \
