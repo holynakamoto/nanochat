@@ -150,6 +150,23 @@ def autodetect_device_type():
     print0(f"Autodetected device type: {device_type}")
     return device_type
 
+def has_bf16_support():
+    """
+    Check if GPU has native BF16 tensor core support (not just software emulation).
+
+    Returns True only for Ampere+ GPUs (compute capability 8.0+).
+    T4 (7.5) has software emulation but not tensor cores, so returns False.
+
+    This is more reliable than torch.cuda.is_bf16_supported() which returns True
+    for software emulation, causing slow compilation on older GPUs.
+    """
+    if not torch.cuda.is_available():
+        return False
+
+    # Check compute capability: BF16 tensor cores require 8.0+ (Ampere and newer)
+    major, minor = torch.cuda.get_device_capability(0)
+    return major >= 8
+
 def compute_init(device_type="cuda"): # cuda|cpu|mps
     """Basic initialization that we keep doing over and over, so make common."""
 

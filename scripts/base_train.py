@@ -26,7 +26,7 @@ import torch
 
 from gpt import GPT, GPTConfig
 from dataloader import tokenizing_distributed_data_loader_bos_bestfit, tokenizing_distributed_data_loader_with_state_bos_bestfit
-from common import compute_init, compute_cleanup, print0, DummyWandb, print_banner, get_base_dir, autodetect_device_type, get_peak_flops
+from common import compute_init, compute_cleanup, print0, DummyWandb, print_banner, get_base_dir, autodetect_device_type, get_peak_flops, has_bf16_support
 from tokenizer import get_tokenizer, get_token_bytes
 from checkpoint_manager import save_checkpoint, load_checkpoint
 from loss_eval import evaluate_bpb
@@ -118,7 +118,7 @@ get_max_memory = torch.cuda.max_memory_allocated if device_type == "cuda" else l
 if device_type == "cuda":
     gpu_device_name = torch.cuda.get_device_name(0)
     gpu_peak_flops = get_peak_flops(gpu_device_name)
-    if torch.cuda.is_bf16_supported():
+    if has_bf16_support():
         amp_dtype = torch.bfloat16
         print0(f"GPU: {gpu_device_name} | Peak FLOPS (BF16): {gpu_peak_flops:.2e}")
     else:

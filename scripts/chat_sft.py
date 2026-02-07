@@ -16,7 +16,7 @@ import time
 import wandb
 import torch
 from contextlib import nullcontext
-from common import compute_init, compute_cleanup, print0, DummyWandb, get_base_dir, autodetect_device_type
+from common import compute_init, compute_cleanup, print0, DummyWandb, get_base_dir, autodetect_device_type, has_bf16_support
 from tokenizer import get_token_bytes
 from checkpoint_manager import save_checkpoint
 from loss_eval import evaluate_bpb
@@ -69,7 +69,7 @@ master_process = ddp_rank == 0
 
 # Auto-detect dtype based on GPU capabilities
 if device_type == "cuda":
-    if torch.cuda.is_bf16_supported():
+    if has_bf16_support():
         default_dtype = torch.bfloat16
     else:
         default_dtype = torch.float16

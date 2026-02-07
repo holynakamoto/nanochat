@@ -15,7 +15,7 @@ from contextlib import nullcontext
 import torch
 import torch.distributed as dist
 
-from common import compute_init, compute_cleanup, get_dist_info, print0, autodetect_device_type
+from common import compute_init, compute_cleanup, get_dist_info, print0, autodetect_device_type, has_bf16_support
 from checkpoint_manager import load_model
 from engine import Engine
 
@@ -202,7 +202,7 @@ if __name__ == "__main__":
 
     # Auto-detect dtype based on GPU capabilities
     if device_type == "cuda":
-        if torch.cuda.is_bf16_supported():
+        if has_bf16_support():
             default_dtype = torch.bfloat16
         else:
             default_dtype = torch.float16

@@ -6,7 +6,7 @@ python -m scripts.chat_cli
 """
 import argparse
 import torch
-from common import compute_init, autodetect_device_type
+from common import compute_init, autodetect_device_type, has_bf16_support
 from contextlib import nullcontext
 from engine import Engine
 from checkpoint_manager import load_model
@@ -29,7 +29,7 @@ ddp, ddp_rank, ddp_local_rank, ddp_world_size, device = compute_init(device_type
 
 # Auto-detect dtype based on GPU capabilities
 if device_type == "cuda":
-    if torch.cuda.is_bf16_supported():
+    if has_bf16_support():
         default_dtype = torch.bfloat16
     else:
         default_dtype = torch.float16

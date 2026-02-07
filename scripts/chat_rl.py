@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from common import compute_init, compute_cleanup, print0, get_base_dir, DummyWandb, autodetect_device_type
+from common import compute_init, compute_cleanup, print0, get_base_dir, DummyWandb, autodetect_device_type, has_bf16_support
 from checkpoint_manager import save_checkpoint, load_model
 from engine import Engine
 from tasks.gsm8k import GSM8K
@@ -74,7 +74,7 @@ master_process = ddp_rank == 0 # this process will do logging, checkpointing etc
 
 # Auto-detect dtype based on GPU capabilities
 if device_type == "cuda":
-    if torch.cuda.is_bf16_supported():
+    if has_bf16_support():
         default_dtype = torch.bfloat16
     else:
         default_dtype = torch.float16

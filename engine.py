@@ -17,7 +17,7 @@ import signal
 import warnings
 from contextlib import contextmanager
 from collections import deque
-from common import compute_init, autodetect_device_type
+from common import compute_init, autodetect_device_type, has_bf16_support
 from checkpoint_manager import load_model
 from contextlib import nullcontext
 
@@ -172,10 +172,10 @@ class Engine:
         """Same as generate, but does single prefill and then clones the KV cache."""
         assert isinstance(tokens, list) and isinstance(tokens[0], int), "expecting list of ints"
         device = self.model.get_device()
-        # Detect dtype: check BF16 support on CUDA, otherwise use FP32
+        # Detect dtype: check BF16 tensor core support on CUDA, otherwise use FP32
         device_type = device.type if isinstance(device, torch.device) else device
         if device_type == "cuda":
-            dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+            dtype = torch.bfloat16 if has_bf16_support() else torch.float16
         else:
             dtype = torch.float32
         rng = torch.Generator(device=device)
