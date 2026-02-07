@@ -37,6 +37,7 @@ class GPTConfig:
     # Characters: L=long (full context), S=short (half context)
     # Examples: "L"=all full context, "SL"=alternating, "SSL"=two short then one long
     window_pattern: str = "SSSL"
+    model_dtype: torch.dtype = torch.bfloat16  # Model parameter dtype (bf16 for Ampere+, fp16 for older GPUs)
 
 
 def norm(x):
@@ -234,11 +235,11 @@ class GPT(nn.Module):
         cos, sin = self._precompute_rotary_embeddings(self.rotary_seq_len, head_dim)
         self.cos, self.sin = cos, sin
 
-        # Cast embeddings to bf16: optimizer can tolerate it and it saves memory
+        # Cast embeddings to model dtype: optimizer can tolerate it and it saves memory
         if self.transformer.wte.weight.device.type == "cuda":
-            self.transformer.wte.to(dtype=torch.bfloat16)
+            self.transformer.wte.to(dtype=self.config.model_dtype)
             for ve in self.value_embeds.values():
-                ve.to(dtype=torch.bfloat16)
+                ve.to(dtype=self.config.model_dtype)
 
     def _precompute_rotary_embeddings(self, seq_len, head_dim, base=10000, device=None):
         # TODO: bump base theta more? e.g. 100K is more common more recently
@@ -253,7 +254,7 @@ class GPT(nn.Module):
         # calculate the rotation frequencies at each (time, channel) pair
         freqs = torch.outer(t, inv_freq)
         cos, sin = freqs.cos(), freqs.sin()
-        cos, sin = cos.bfloat16(), sin.bfloat16() # keep them in bfloat16
+        cos, sin = cos.to(self.config.model_dtype), sin.to(self.config.model_dtype) # cast to model dtype
         cos, sin = cos[None, :, None, :], sin[None, :, None, :] # add batch and head dims for later broadcasting
         return cos, sin
 
@@ -391,7 +392,7 @@ class GPT(nn.Module):
         # Grab the rotary embeddings for the current sequence length (they are of shape (1, seq_len, 1, head_dim/2))
         assert T <= self.cos.size(1), f"Sequence length grew beyond the rotary embeddings cache: {T} > {self.cos.size(1)}"
         assert idx.device == self.cos.device, f"Rotary embeddings and idx are on different devices: {idx.device} != {self.cos.device}"
-        assert self.cos.dtype == torch.bfloat16, "Rotary embeddings must be in bfloat16"
+        assert self.cos.dtype == self.config.model_dtype, f"Rotary embeddings must match model dtype {self.config.model_dtype}"
         # if kv cache exists, we need to offset the rotary embeddings to the current position in the cache
         T0 = 0 if kv_cache is None else kv_cache.get_pos()
         cos_sin = self.cos[:, T0:T0+T], self.sin[:, T0:T0+T] # truncate cache to current sequence length

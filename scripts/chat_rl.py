@@ -39,7 +39,7 @@ parser = argparse.ArgumentParser(description="Reinforcement learning on GSM8K")
 parser.add_argument("--run", type=str, default="dummy", help="wandb run name ('dummy' disables wandb logging)")
 # Runtime
 parser.add_argument("--device-type", type=str, default="", help="cuda|cpu|mps (empty = autodetect)")
-parser.add_argument("--dtype", type=str, default="bfloat16", help="float32|bfloat16")
+parser.add_argument("--dtype", type=str, default="bfloat16", help="float32|bfloat16|float16")
 # Model loading
 parser.add_argument("--model-tag", type=str, default=None, help="model tag to load from")
 parser.add_argument("--model-step", type=int, default=None, help="model step to load from")
@@ -71,7 +71,27 @@ user_config = vars(args).copy()
 device_type = autodetect_device_type() if args.device_type == "" else args.device_type
 ddp, ddp_rank, ddp_local_rank, ddp_world_size, device = compute_init(device_type)
 master_process = ddp_rank == 0 # this process will do logging, checkpointing etc.
-ptdtype = torch.float32 if args.dtype == 'float32' else torch.bfloat16
+
+# Auto-detect dtype based on GPU capabilities
+if device_type == "cuda":
+    if torch.cuda.is_bf16_supported():
+        default_dtype = torch.bfloat16
+    else:
+        default_dtype = torch.float16
+        print0("GPU does not support bfloat16, defaulting to float16")
+else:
+    default_dtype = torch.float32
+
+# Override with user-specified dtype if provided
+if args.dtype == "float32":
+    ptdtype = torch.float32
+elif args.dtype == "bfloat16":
+    ptdtype = torch.bfloat16
+elif args.dtype == "float16":
+    ptdtype = torch.float16
+else:
+    ptdtype = default_dtype
+
 autocast_ctx = torch.amp.autocast(device_type=device_type, dtype=ptdtype) if device_type == "cuda" else nullcontext()
 
 # wandb logging init

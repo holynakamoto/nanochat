@@ -127,7 +127,7 @@ if device_type == "cuda":
         print0("GPU does not support bfloat16, using float16 with GradScaler")
     autocast_ctx = torch.amp.autocast(device_type=device_type, dtype=amp_dtype)
 else:
-    amp_dtype = None
+    amp_dtype = torch.float32  # Use float32 for CPU/MPS
     gpu_peak_flops = float('inf')  # MFU not meaningful for CPU/MPS
     autocast_ctx = nullcontext()
 scaler = torch.amp.GradScaler(enabled=(amp_dtype == torch.float16))
@@ -215,7 +215,7 @@ if args.depth != 12:
 # Initialize the Model
 
 # Create a new model with random weights
-model_config_kwargs = dict(sequence_len=args.max_seq_len, vocab_size=vocab_size, n_layer=num_layers, n_head=num_heads, n_kv_head=num_kv_heads, n_embd=model_dim, window_pattern=args.window_pattern)
+model_config_kwargs = dict(sequence_len=args.max_seq_len, vocab_size=vocab_size, n_layer=num_layers, n_head=num_heads, n_kv_head=num_kv_heads, n_embd=model_dim, window_pattern=args.window_pattern, model_dtype=amp_dtype)
 with torch.device("meta"):
     # All tensors are created as meta tensors (they have shape/dtype but no data)
     model_config = GPTConfig(**model_config_kwargs)
