@@ -1,0 +1,98 @@
+name: Train IaC-GPT
+
+on:
+  workflow_dispatch:
+    inputs:
+      datasets:
+        description: 'Kaggle datasets to ingest (space separated user/dataset)'
+        default: 'soumikrakshit/terraform-code-examples vumichien/kubernetes-manifest-data'
+        required: true
+      model_tag:
+        description: 'Tag for the model'
+        default: 'iac-gpt-ci'
+        required: true
+      depth:
+        description: 'Model depth'
+        default: '6'
+        required: true
+      iterations:
+        description: 'Number of training iterations'
+        default: '100'
+        required: true
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Setup Python
+        run: uv python install 3.10
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Kaggle Pulldown
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        run: |
+          uv run scripts/kaggle_ingest.py --datasets ${{ github.event.inputs.datasets }}
+
+      - name: Prepare Data (Repackage)
+        run: |
+          mkdir -p ~/.cache/nanochat/iac_data
+          uv run python dev/repackage_iac_data.py \
+            --input-dir data/iac_raw_cloned \
+            --output-dir ~/.cache/nanochat/iac_data \
+            --include-synthetic \
+            --include-docs
+          ln -sf ~/.cache/nanochat/iac_data ~/.cache/nanochat/base_data
+
+      - name: Train Tokenizer
+        run: |
+          mkdir -p ~/.cache/nanochat/tokenizer
+          uv run python -m scripts.tok_train --vocab-size 49152 --validate
+
+      - name: Train Model (Speedrun)
+        env:
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          WANDB_RUN: ${{ github.event.inputs.model_tag }}
+        run: |
+          # Use reduced settings for CI runners to avoid OOM and timeout
+          uv run python -m scripts.base_train \
+            --depth=${{ github.event.inputs.depth }} \
+            --device-type=cpu \
+            --num-iterations=${{ github.event.inputs.iterations }} \
+            --device-batch-size=2 \
+            --run=$WANDB_RUN \
+            --model-tag=${{ github.event.inputs.model_tag }} \
+            --eval-every=10 \
+            --sample-every=20
+
+      - name: Evaluate Model
+        run: |
+          uv run python -m scripts.base_eval --device-type=cpu
+
+      - name: Save Checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: iac-gpt-ci-checkpoint
+          path: ~/.cache/nanochat/checkpoints/
+
+      - name: Generate Training Report
+        run: |
+          uv run python -m nanochat.report generate
+          mv report.md training-report.md
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-report
+          path: training-report.md
