@@ -24,44 +24,129 @@ echo ""
 mkdir -p "$OUTPUT_DIR"/{terraform,kubernetes,ansible,crossplane,docker}
 mkdir -p "$TEMP_DIR"
 
-# Top IaC repositories (curated list of high-quality repos)
+# Top IaC repositories (expanded corpus for production training)
 declare -a REPOS=(
-    # Terraform - AWS
+    # Terraform - AWS (comprehensive modules)
     "terraform-aws-modules/terraform-aws-vpc"
     "terraform-aws-modules/terraform-aws-eks"
     "terraform-aws-modules/terraform-aws-rds"
     "terraform-aws-modules/terraform-aws-security-group"
     "terraform-aws-modules/terraform-aws-s3-bucket"
     "terraform-aws-modules/terraform-aws-iam"
+    "terraform-aws-modules/terraform-aws-ec2-instance"
+    "terraform-aws-modules/terraform-aws-autoscaling"
+    "terraform-aws-modules/terraform-aws-alb"
+    "terraform-aws-modules/terraform-aws-lambda"
+    "terraform-aws-modules/terraform-aws-dynamodb-table"
+    "terraform-aws-modules/terraform-aws-cloudwatch"
+    "terraform-aws-modules/terraform-aws-route53"
+    "terraform-aws-modules/terraform-aws-acm"
+    "terraform-aws-modules/terraform-aws-apigateway-v2"
+    "terraform-aws-modules/terraform-aws-ecs"
+    "terraform-aws-modules/terraform-aws-ecr"
+    "terraform-aws-modules/terraform-aws-elasticache"
+    "terraform-aws-modules/terraform-aws-elb"
+    "terraform-aws-modules/terraform-aws-key-pair"
+    "terraform-aws-modules/terraform-aws-kms"
+    "terraform-aws-modules/terraform-aws-sns"
+    "terraform-aws-modules/terraform-aws-sqs"
     "cloudposse/terraform-aws-components"
     "gruntwork-io/terragrunt-infrastructure-live-example"
-    
+    "gruntwork-io/terraform-aws-security"
+    "gruntwork-io/terraform-aws-service-catalog"
+
     # Terraform - GCP
     "terraform-google-modules/terraform-google-network"
     "terraform-google-modules/terraform-google-kubernetes-engine"
     "terraform-google-modules/terraform-google-sql-db"
-    
+    "terraform-google-modules/terraform-google-vm"
+    "terraform-google-modules/terraform-google-cloud-storage"
+    "terraform-google-modules/terraform-google-iam"
+    "terraform-google-modules/terraform-google-lb"
+    "terraform-google-modules/terraform-google-project-factory"
+
     # Terraform - Azure
     "Azure/terraform-azurerm-aks"
     "Azure/terraform-azurerm-network"
-    
-    # Kubernetes manifests
+    "Azure/terraform-azurerm-virtual-machine"
+    "Azure/terraform-azurerm-loadbalancer"
+    "Azure/terraform-azurerm-postgresql"
+    "Azure/terraform-azurerm-storage"
+
+    # Terraform - Multi-cloud patterns
+    "hashicorp/terraform-provider-aws"
+    "hashicorp/terraform-provider-azurerm"
+    "hashicorp/terraform-provider-google"
+    "hashicorp/terraform-provider-kubernetes"
+
+    # Kubernetes - Core examples and operators
     "kubernetes/examples"
     "kubernetes/website"
+    "kubernetes/ingress-nginx"
+    "kubernetes-sigs/external-dns"
+    "kubernetes-sigs/cluster-api"
+    "kubernetes-sigs/aws-load-balancer-controller"
     "argoproj/argo-cd"
+    "argoproj/argo-workflows"
+    "argoproj/argo-rollouts"
     "istio/istio"
+    "linkerd/linkerd2"
     "prometheus-operator/kube-prometheus"
+    "prometheus-operator/prometheus-operator"
     "grafana/grafana"
-    
-    # Ansible
+    "grafana/loki"
+    "grafana/tempo"
+    "jetstack/cert-manager"
+    "fluxcd/flux2"
+    "metallb/metallb"
+    "rook/rook"
+    "longhorn/longhorn"
+    "velero/velero"
+    "kubevirt/kubevirt"
+    "knative/serving"
+
+    # Helm charts
+    "helm/charts"
+    "bitnami/charts"
+    "prometheus-community/helm-charts"
+    "grafana/helm-charts"
+    "elastic/helm-charts"
+    "jaegertracing/helm-charts"
+    "kong/charts"
+
+    # Ansible - Collections and playbooks
     "ansible/ansible-examples"
+    "ansible-collections/community.general"
+    "ansible-collections/community.kubernetes"
+    "ansible-collections/amazon.aws"
+    "ansible-collections/google.cloud"
+    "ansible-collections/azure.azcollection"
     "geerlingguy/ansible-for-devops"
+    "geerlingguy/ansible-role-docker"
+    "geerlingguy/ansible-role-kubernetes"
+    "geerlingguy/ansible-role-jenkins"
     "elastic/ansible-elasticsearch"
-    
-    # Crossplane
+    "debops/debops"
+
+    # Crossplane - Compositions and XRDs
     "crossplane/crossplane"
+    "crossplane-contrib/provider-aws"
+    "crossplane-contrib/provider-gcp"
+    "crossplane-contrib/provider-azure"
     "upbound/platform-ref-aws"
     "upbound/platform-ref-gcp"
+    "upbound/platform-ref-azure"
+    "upbound/platform-ref-multi"
+
+    # Docker and containerization
+    "docker-library/official-images"
+    "docker/awesome-compose"
+    "jessfraz/dockerfiles"
+
+    # Pulumi (IaC alternative)
+    "pulumi/examples"
+    "pulumi/pulumi-aws"
+    "pulumi/pulumi-kubernetes"
 )
 
 echo "Will clone ${#REPOS[@]} repositories"
