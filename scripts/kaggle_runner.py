@@ -91,13 +91,15 @@ class KaggleRunner:
         print(f"   GPU: {metadata['enable_gpu']}")
         print(f"   Internet: {metadata['enable_internet']}")
         print(f"   Private: {metadata['is_private']}")
-        print(f"   Timeout: {timeout_hours}h ({timeout_seconds}s)")
-        print(f"\n⚡ This will automatically START EXECUTION on Kaggle...")
+        print(f"   Max Runtime: {timeout_hours}h ({timeout_seconds}s)")
+        print(f"\n📤 Pushing notebook to Kaggle...")
+        print(f"⚠️  Note: Kaggle API cannot trigger execution automatically")
+        print(f"   You'll need to click 'Run' on Kaggle after push completes")
 
         try:
-            # Push the kernel with timeout (triggers execution)
+            # Push the kernel with timeout (sets max runtime limit)
             api.kernels_push(str(working_dir), timeout=timeout_seconds)
-            print(f"✅ Kernel pushed and execution started!")
+            print(f"✅ Kernel pushed successfully!")
             return True
         except Exception as e:
             print(f"❌ Error pushing kernel: {e}")
@@ -181,9 +183,13 @@ def main():
     if not success:
         sys.exit(1)
 
-    print(f"\n🔗 Monitor kernel at: {runner.get_kernel_url()}")
-    print(f"\n✅ Training is now running on Kaggle!")
-    print(f"\n💡 To monitor output:")
+    print(f"\n🔗 Kernel URL: {runner.get_kernel_url()}")
+    print(f"\n⚠️  IMPORTANT: Click 'Run' on Kaggle to start training!")
+    print(f"\n📋 Next steps:")
+    print(f"   1. Visit: {runner.get_kernel_url()}")
+    print(f"   2. Click the 'Run' button (top right)")
+    print(f"   3. Training will start on GPU P100 (max {args.timeout_hours}h)")
+    print(f"\n💡 To monitor output (after starting):")
     print(f"   kaggle kernels output {runner.slug}")
 
     if args.monitor:

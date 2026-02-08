@@ -37,23 +37,27 @@ jobs:
           echo '{"username":"${{ secrets.KAGGLE_USERNAME }}","key":"${{ secrets.KAGGLE_KEY }}"}' > ~/.kaggle/kaggle.json
           chmod 600 ~/.kaggle/kaggle.json
 
-      - name: Push notebook and start execution on Kaggle
+      - name: Push notebook to Kaggle
         run: |
           uv run python scripts/kaggle_runner.py --timeout-hours 4
-          echo "✅ Training started on Kaggle GPU P100!"
+          echo "✅ Notebook pushed to Kaggle!"
           echo "🔗 View at: https://www.kaggle.com/code/nicksmoore/iacgpt-v2"
+          echo "⚠️  Click 'Run' on Kaggle to start training"
 
       - name: Summary
         run: |
-          echo "## 🚀 Training Started on Kaggle GPU P100" >> $GITHUB_STEP_SUMMARY
+          echo "## 📤 Notebook Pushed to Kaggle" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Your IaC-GPT training is now running on Kaggle with GPU acceleration." >> $GITHUB_STEP_SUMMARY
+          echo "Your IaC-GPT notebook has been uploaded to Kaggle." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Status:**" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Notebook pushed via API" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Execution started automatically" >> $GITHUB_STEP_SUMMARY
-          echo "- ⏱️ Timeout: 4 hours" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚠️  Manual 'Run' required (Kaggle API limitation)" >> $GITHUB_STEP_SUMMARY
+          echo "- ⏱️ Max Runtime: 4 hours" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Monitor:**" >> $GITHUB_STEP_SUMMARY
-          echo "- [View kernel on Kaggle](https://www.kaggle.com/code/nicksmoore/iacgpt-v2)" >> $GITHUB_STEP_SUMMARY
-          echo "- Or run: \`kaggle kernels output nicksmoore/iacgpt-v2\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Visit [your kernel on Kaggle](https://www.kaggle.com/code/nicksmoore/iacgpt-v2)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Click the **Run** button (top right)" >> $GITHUB_STEP_SUMMARY
+          echo "3. Training will start on GPU P100" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Monitor:** \`kaggle kernels output nicksmoore/iacgpt-v2\`" >> $GITHUB_STEP_SUMMARY
