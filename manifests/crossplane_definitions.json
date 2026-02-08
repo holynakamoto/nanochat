@@ -1,0 +1,26 @@
+[
+    {
+        "messages": [
+            {
+                "role": "user",
+                "content": "Define a Crossplane CompositeResourceDefinition for a PostgreSQL instance."
+            },
+            {
+                "role": "assistant",
+                "content": "Here is an example XRD for a PostgreSQL instance:\n\n```yaml\napiVersion: apiextensions.crossplane.io/v1\nkind: CompositeResourceDefinition\nmetadata:\n  name: xpostgresqlinstances.database.example.org\nspec:\n  group: database.example.org\n  names:\n    kind: XPostgreSQLInstance\n    plural: xpostgresqlinstances\n  claimNames:\n    kind: PostgreSQLInstance\n    plural: postgresqlinstances\n  versions:\n  - name: v1alpha1\n    served: true\n    referenceable: true\n    schema:\n      openAPIV3Schema:\n        type: object\n        properties:\n          spec:\n            type: object\n            properties:\n              storageGB:\n                type: integer\n```"
+            }
+        ]
+    },
+    {
+        "messages": [
+            {
+                "role": "user",
+                "content": "Create a Crossplane Composition for the PostgreSQL XRD using AWS RDS."
+            },
+            {
+                "role": "assistant",
+                "content": "Here is a Composition that satisfies the XPostgreSQLInstance XRD using an AWS RDS instance:\n\n```yaml\napiVersion: apiextensions.crossplane.io/v1\nkind: Composition\nmetadata:\n  name: xpostgresqlinstances.aws.database.example.org\n  labels:\n    provider: aws\n    guide: quickstart\nspec:\n  compositeTypeRef:\n    apiVersion: database.example.org/v1alpha1\n    kind: XPostgreSQLInstance\n  resources:\n  - name: rdsinstance\n    base:\n      apiVersion: database.aws.upbound.io/v1beta1\n      kind: Instance\n      spec:\n        forProvider:\n          region: us-east-1\n          dbInstanceClass: db.t3.micro\n          allocatedStorage: 20\n          engine: postgres\n          engineVersion: \"14\"\n          skipFinalSnapshot: true\n          publiclyAccessible: false\n    patches:\n    - fromFieldPath: \"spec.storageGB\"\n      toFieldPath: \"spec.forProvider.allocatedStorage\"\n```"
+            }
+        ]
+    }
+]
